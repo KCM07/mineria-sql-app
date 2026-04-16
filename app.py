@@ -163,8 +163,35 @@ elif seccion == "Ver tablas":
 # SECCIÓN: RELACIONES
 # =========================================================
 elif seccion == "Relaciones":
-    st.subheader("🔗 Verificación de relaciones")
+    st.subheader("🔗 Modelo de datos y verificación de relaciones")
 
+    st.markdown("""
+    En esta sección se muestra el modelo relacional de la base de datos y la validación
+    de integridad referencial entre la tabla dimensión `dim_procesos` y las tablas operativas
+    de preparación, extracción y refinación.
+    """)
+
+    # -----------------------------------------------------
+    # IMAGEN DEL MODELO RELACIONAL
+    # -----------------------------------------------------
+    # Asegúrate de guardar la imagen con este nombre
+    # en la misma carpeta donde está app.py
+    ruta_imagen = BASE_DIR / "modelo_relacional.png"
+
+    if ruta_imagen.exists():
+        st.image(
+            str(ruta_imagen),
+            caption="Modelo relacional de la base de datos mineria_operaciones",
+            use_container_width=True
+        )
+    else:
+        st.info("No se encontró la imagen modelo_relacional.png en la carpeta del proyecto.")
+
+    st.markdown("---")
+
+    # -----------------------------------------------------
+    # VERIFICACIÓN DE REGISTROS HUÉRFANOS
+    # -----------------------------------------------------
     prep_rel = preparacion.merge(dim_procesos, on="id_proceso", how="left", indicator=True)
     prep_huerfanos = prep_rel[prep_rel["_merge"] == "left_only"]
 
@@ -176,6 +203,9 @@ elif seccion == "Relaciones":
         ref_rel = refinacion.merge(dim_procesos, on="id_proceso", how="left", indicator=True)
         ref_huerfanos = ref_rel[ref_rel["_merge"] == "left_only"]
 
+    # -----------------------------------------------------
+    # MÉTRICAS
+    # -----------------------------------------------------
     c1, c2, c3 = st.columns(3)
     c1.metric("Huérfanos preparación", len(prep_huerfanos))
     c2.metric("Huérfanos extracción", len(ext_huerfanos))
@@ -183,8 +213,16 @@ elif seccion == "Relaciones":
 
     st.markdown("---")
 
+    # -----------------------------------------------------
+    # INTERPRETACIÓN
+    # -----------------------------------------------------
     if len(prep_huerfanos) == 0 and len(ext_huerfanos) == 0 and len(ref_huerfanos) == 0:
-        st.success("No se encontraron registros huérfanos. Las relaciones son consistentes.")
+        st.success("No se encontraron registros huérfanos. Las relaciones entre tablas son consistentes.")
+        st.markdown("""
+        **Interpretación:**  
+        Todos los registros de las tablas operativas tienen correspondencia en la tabla
+        `dim_procesos`, por lo que la integridad referencial del modelo es correcta.
+        """)
     else:
         st.warning("Se detectaron registros sin correspondencia en la tabla dimensión.")
 
