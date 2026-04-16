@@ -176,7 +176,7 @@ elif seccion == "Relaciones":
     # -----------------------------------------------------
     # Asegúrate de guardar la imagen con este nombre
     # en la misma carpeta donde está app.py
-    ruta_imagen = BASE_DIR / r"D:\2026_KEM\CODEA 2026\Proyecto 3\relaciones.png"
+    ruta_imagen = BASE_DIR /"relaciones.png"
 
     if ruta_imagen.exists():
         st.image(
