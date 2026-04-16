@@ -75,7 +75,7 @@ refinacion = convertir_fecha(refinacion, "fecha")
 # =========================================================
 # TÍTULO PRINCIPAL
 # =========================================================
-st.title("💻 GESTIÓN DE BASES DE DATOS EN MINERÍA - MySQL🐬")
+st.title("💻 DASHBOARD GESTIÓN MINERIA - MySQL🐬")
 st.markdown(
     "Visualización interactiva de la información operativa de "
     "**preparación, extracción y refinación**."
