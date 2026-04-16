@@ -20,24 +20,32 @@ BASE_DIR = Path(__file__).resolve().parent
 # =========================================================
 # FUNCIÓN PARA CARGAR CSV
 # =========================================================
+
 @st.cache_data
 def cargar_csv(nombre_archivo: str) -> pd.DataFrame:
     """
-    Carga un archivo CSV desde la carpeta del proyecto.
-    Usa caché para mejorar el rendimiento de la app.
+    Carga un CSV probando varias codificaciones comunes.
     """
     ruta = BASE_DIR / nombre_archivo
+
     if not ruta.exists():
         st.error(f"No se encontró el archivo: {nombre_archivo}")
         return pd.DataFrame()
 
-    try:
-        df = pd.read_csv(ruta)
-        return df
-    except Exception as e:
-        st.error(f"Error al leer {nombre_archivo}: {e}")
-        return pd.DataFrame()
+    codificaciones = ["utf-8", "latin-1", "cp1252"]
 
+    for enc in codificaciones:
+        try:
+            df = pd.read_csv(ruta, encoding=enc)
+            return df
+        except UnicodeDecodeError:
+            continue
+        except Exception as e:
+            st.error(f"Error al leer {nombre_archivo}: {e}")
+            return pd.DataFrame()
+
+    st.error(f"No se pudo leer {nombre_archivo} con las codificaciones probadas.")
+    return pd.DataFrame()
 
 # =========================================================
 # CARGA DE TABLAS
