@@ -316,7 +316,19 @@ elif seccion == "Consultas analíticas":
 # SECCIÓN: DASHBOARD
 # =========================================================
 elif seccion == "Dashboard":
-    st.subheader("📈 Dashboard interactivo")
+    st.subheader("📈 Dashboard ejecutivo de procesos mineros")
+
+    # -----------------------------------------------------
+    # PREPARACIÓN DE DATOS
+    # -----------------------------------------------------
+    prep_full = preparacion.merge(dim_procesos, on="id_proceso", how="left")
+    ext_full = extraccion.merge(dim_procesos, on="id_proceso", how="left")
+
+    # Si refinación tiene id_proceso, también la vinculamos
+    if "id_proceso" in refinacion.columns:
+        ref_full = refinacion.merge(dim_procesos, on="id_proceso", how="left")
+    else:
+        ref_full = refinacion.copy()
 
     # -----------------------------------------------------
     # FILTROS
@@ -324,143 +336,303 @@ elif seccion == "Dashboard":
     st.markdown("### 🎛️ Filtros")
 
     procesos_disponibles = sorted(dim_procesos["proceso"].dropna().unique().tolist())
-    procesos_seleccionados = st.multiselect(
-        "Filtrar por proceso",
+    procesos_sel = st.multiselect(
+        "Selecciona procesos",
         options=procesos_disponibles,
         default=procesos_disponibles
     )
 
-    # Unimos preparación con dimensión para filtrar por nombre
-    prep_full = preparacion.merge(dim_procesos, on="id_proceso", how="left")
-    ext_full = extraccion.merge(dim_procesos, on="id_proceso", how="left")
+    if procesos_sel:
+        prep_filtrado = prep_full[prep_full["proceso"].isin(procesos_sel)].copy()
+        ext_filtrado = ext_full[ext_full["proceso"].isin(procesos_sel)].copy()
 
-    if procesos_seleccionados:
-        prep_filtrado = prep_full[prep_full["proceso"].isin(procesos_seleccionados)].copy()
-        ext_filtrado = ext_full[ext_full["proceso"].isin(procesos_seleccionados)].copy()
+        if "proceso" in ref_full.columns:
+            ref_filtrado = ref_full[ref_full["proceso"].isin(procesos_sel)].copy()
+        else:
+            ref_filtrado = ref_full.copy()
     else:
         prep_filtrado = prep_full.copy()
         ext_filtrado = ext_full.copy()
+        ref_filtrado = ref_full.copy()
 
     # -----------------------------------------------------
-    # KPIs
+    # KPIs PRINCIPALES
     # -----------------------------------------------------
     st.markdown("### 📌 Indicadores clave")
 
-    total_ton = prep_filtrado["toneladas_procesadas"].sum()
-    costo_prom = prep_filtrado["costo_tonelada_usd"].mean()
-    recuperacion_prom = prep_filtrado["porcentaje_recuperacion"].mean()
-    extraccion_prom = ext_filtrado["porcentaje_extraccion"].mean()
+    total_ton = prep_filtrado["toneladas_procesadas"].sum() if not prep_filtrado.empty else 0
+    costo_prom = prep_filtrado["costo_tonelada_usd"].mean() if not prep_filtrado.empty else 0
+    rec_prom = prep_filtrado["porcentaje_recuperacion"].mean() if not prep_filtrado.empty else 0
+    ext_prom = ext_filtrado["porcentaje_extraccion"].mean() if not ext_filtrado.empty else 0
 
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Toneladas procesadas", f"{total_ton:,.2f}")
-    k2.metric("Costo promedio USD/t", f"{costo_prom:,.2f}")
-    k3.metric("Recuperación promedio %", f"{recuperacion_prom:,.2f}")
-    k4.metric("Extracción promedio %", f"{extraccion_prom:,.2f}")
+    if not ref_filtrado.empty and "pureza_final_pct" in ref_filtrado.columns and "pureza_inicial_pct" in ref_filtrado.columns:
+        mejora_pureza_prom = (ref_filtrado["pureza_final_pct"] - ref_filtrado["pureza_inicial_pct"]).mean()
+    else:
+        mejora_pureza_prom = 0
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Toneladas totales", f"{total_ton:,.2f}")
+    c2.metric("Costo promedio USD/t", f"{costo_prom:,.2f}")
+    c3.metric("Recuperación promedio %", f"{rec_prom:,.2f}")
+    c4.metric("Extracción promedio %", f"{ext_prom:,.2f}")
+    c5.metric("Mejora pureza promedio", f"{mejora_pureza_prom:,.2f}")
 
     st.markdown("---")
 
     # -----------------------------------------------------
-    # GRÁFICO 1: TONELADAS POR PROCESO
+    # ESTADÍSTICAS DESCRIPTIVAS
     # -----------------------------------------------------
-    col1, col2 = st.columns(2)
+    st.markdown("### 📊 Estadísticas descriptivas")
 
-    with col1:
-        st.markdown("### Toneladas por proceso")
-        graf1 = (
+    col_est_1, col_est_2 = st.columns(2)
+
+    with col_est_1:
+        st.markdown("#### Preparación")
+        if not prep_filtrado.empty:
+            stats_prep = prep_filtrado[
+                [
+                    "toneladas_procesadas",
+                    "porcentaje_recuperacion",
+                    "tiempo_operacion_horas",
+                    "consumo_energia_kwh",
+                    "costo_tonelada_usd"
+                ]
+            ].describe().T
+            st.dataframe(stats_prep, use_container_width=True)
+        else:
+            st.info("No hay datos de preparación para mostrar.")
+
+    with col_est_2:
+        st.markdown("#### Extracción")
+        if not ext_filtrado.empty:
+            stats_ext = ext_filtrado[
+                [
+                    "toneladas_procesadas",
+                    "porcentaje_extraccion",
+                    "temperatura_procesos_celcius",
+                    "consumo_reactivos_kg",
+                    "costo_operacion_usd"
+                ]
+            ].describe().T
+            st.dataframe(stats_ext, use_container_width=True)
+        else:
+            st.info("No hay datos de extracción para mostrar.")
+
+    st.markdown("---")
+
+    # -----------------------------------------------------
+    # GRÁFICOS PRINCIPALES
+    # -----------------------------------------------------
+    st.markdown("### 📈 Gráficos principales")
+
+    # Gráfico 1: toneladas por proceso
+    col_g1, col_g2 = st.columns(2)
+
+    with col_g1:
+        st.markdown("#### Toneladas procesadas por proceso")
+        if not prep_filtrado.empty:
+            g1 = (
+                prep_filtrado.groupby("proceso", as_index=False)["toneladas_procesadas"]
+                .sum()
+                .sort_values("toneladas_procesadas", ascending=False)
+            )
+            fig1, ax1 = plt.subplots(figsize=(8, 4))
+            ax1.bar(g1["proceso"], g1["toneladas_procesadas"])
+            ax1.set_xlabel("Proceso")
+            ax1.set_ylabel("Toneladas")
+            ax1.set_title("Toneladas por proceso")
+            plt.xticks(rotation=45)
+            st.pyplot(fig1)
+        else:
+            st.info("No hay datos para graficar.")
+
+    # Gráfico 2: costo promedio por proceso
+    with col_g2:
+        st.markdown("#### Costo promedio por proceso")
+        if not prep_filtrado.empty:
+            g2 = (
+                prep_filtrado.groupby("proceso", as_index=False)["costo_tonelada_usd"]
+                .mean()
+                .sort_values("costo_tonelada_usd", ascending=False)
+            )
+            fig2, ax2 = plt.subplots(figsize=(8, 4))
+            ax2.bar(g2["proceso"], g2["costo_tonelada_usd"])
+            ax2.set_xlabel("Proceso")
+            ax2.set_ylabel("USD/t")
+            ax2.set_title("Costo promedio")
+            plt.xticks(rotation=45)
+            st.pyplot(fig2)
+        else:
+            st.info("No hay datos para graficar.")
+
+    # Gráfico 3: recuperación vs energía
+    col_g3, col_g4 = st.columns(2)
+
+    with col_g3:
+        st.markdown("#### Recuperación vs consumo de energía")
+        if not prep_filtrado.empty:
+            fig3, ax3 = plt.subplots(figsize=(8, 4))
+            ax3.scatter(
+                prep_filtrado["consumo_energia_kwh"],
+                prep_filtrado["porcentaje_recuperacion"]
+            )
+            ax3.set_xlabel("Consumo energía (kWh)")
+            ax3.set_ylabel("Recuperación (%)")
+            ax3.set_title("Recuperación vs energía")
+            st.pyplot(fig3)
+        else:
+            st.info("No hay datos para graficar.")
+
+    # Gráfico 4: extracción vs temperatura
+    with col_g4:
+        st.markdown("#### Extracción vs temperatura")
+        if not ext_filtrado.empty:
+            fig4, ax4 = plt.subplots(figsize=(8, 4))
+            ax4.scatter(
+                ext_filtrado["temperatura_procesos_celcius"],
+                ext_filtrado["porcentaje_extraccion"]
+            )
+            ax4.set_xlabel("Temperatura (°C)")
+            ax4.set_ylabel("Extracción (%)")
+            ax4.set_title("Extracción vs temperatura")
+            st.pyplot(fig4)
+        else:
+            st.info("No hay datos para graficar.")
+
+    # Gráfico 5: mejora de pureza
+    col_g5, col_g6 = st.columns(2)
+
+    with col_g5:
+        st.markdown("#### Mejora de pureza en refinación")
+        if not ref_filtrado.empty and "pureza_final_pct" in ref_filtrado.columns and "pureza_inicial_pct" in ref_filtrado.columns:
+            g5 = ref_filtrado.copy()
+            g5["mejora_pureza"] = g5["pureza_final_pct"] - g5["pureza_inicial_pct"]
+            g5 = g5[["proceso", "mejora_pureza"]].sort_values("mejora_pureza", ascending=False)
+
+            fig5, ax5 = plt.subplots(figsize=(8, 4))
+            ax5.bar(g5["proceso"], g5["mejora_pureza"])
+            ax5.set_xlabel("Proceso")
+            ax5.set_ylabel("Mejora de pureza")
+            ax5.set_title("Mejora de pureza por proceso")
+            plt.xticks(rotation=45)
+            st.pyplot(fig5)
+        else:
+            st.info("No hay datos de refinación para graficar.")
+
+    # Gráfico 6: evolución temporal
+    with col_g6:
+        st.markdown("#### Evolución temporal de toneladas")
+        if not prep_filtrado.empty and "fecha" in prep_filtrado.columns:
+            g6 = (
+                prep_filtrado.groupby("fecha", as_index=False)["toneladas_procesadas"]
+                .sum()
+                .sort_values("fecha")
+            )
+            fig6, ax6 = plt.subplots(figsize=(8, 4))
+            ax6.plot(g6["fecha"], g6["toneladas_procesadas"], marker="o")
+            ax6.set_xlabel("Fecha")
+            ax6.set_ylabel("Toneladas")
+            ax6.set_title("Toneladas procesadas en el tiempo")
+            plt.xticks(rotation=45)
+            st.pyplot(fig6)
+        else:
+            st.info("No hay datos temporales para graficar.")
+
+    st.markdown("---")
+
+    # -----------------------------------------------------
+    # CONSULTAS / RESÚMENES MÁS IMPORTANTES
+    # -----------------------------------------------------
+    st.markdown("### 🧠 Consultas y resúmenes clave")
+
+    # Consulta 1: top toneladas
+    top_ton = pd.DataFrame()
+    if not prep_filtrado.empty:
+        top_ton = (
             prep_filtrado.groupby("proceso", as_index=False)["toneladas_procesadas"]
             .sum()
-            .sort_values("toneladas_procesadas", ascending=False)
+            .rename(columns={"toneladas_procesadas": "total_toneladas"})
+            .sort_values("total_toneladas", ascending=False)
         )
 
-        fig1, ax1 = plt.subplots(figsize=(8, 4))
-        ax1.bar(graf1["proceso"], graf1["toneladas_procesadas"])
-        ax1.set_xlabel("Proceso")
-        ax1.set_ylabel("Toneladas")
-        ax1.set_title("Toneladas procesadas")
-        plt.xticks(rotation=45)
-        st.pyplot(fig1)
-
-    # -----------------------------------------------------
-    # GRÁFICO 2: COSTO PROMEDIO POR PROCESO
-    # -----------------------------------------------------
-    with col2:
-        st.markdown("### Costo promedio por proceso")
-        graf2 = (
+    # Consulta 2: top costo
+    top_costo = pd.DataFrame()
+    if not prep_filtrado.empty:
+        top_costo = (
             prep_filtrado.groupby("proceso", as_index=False)["costo_tonelada_usd"]
             .mean()
-            .sort_values("costo_tonelada_usd", ascending=False)
+            .rename(columns={"costo_tonelada_usd": "costo_promedio"})
+            .sort_values("costo_promedio", ascending=False)
         )
 
-        fig2, ax2 = plt.subplots(figsize=(8, 4))
-        ax2.bar(graf2["proceso"], graf2["costo_tonelada_usd"])
-        ax2.set_xlabel("Proceso")
-        ax2.set_ylabel("USD/t")
-        ax2.set_title("Costo promedio")
-        plt.xticks(rotation=45)
-        st.pyplot(fig2)
+    # Consulta 3: energía por tonelada
+    energia_ton = pd.DataFrame()
+    if not prep_filtrado.empty:
+        energia_ton = (
+            prep_filtrado.groupby("proceso", as_index=False)
+            .agg({
+                "consumo_energia_kwh": "sum",
+                "toneladas_procesadas": "sum"
+            })
+        )
+        energia_ton["kwh_por_tonelada"] = (
+            energia_ton["consumo_energia_kwh"] / energia_ton["toneladas_procesadas"]
+        )
+        energia_ton = energia_ton[["proceso", "kwh_por_tonelada"]].sort_values(
+            "kwh_por_tonelada", ascending=False
+        )
+
+    # Consulta 4: registros sobre el promedio
+    sobre_promedio = pd.DataFrame()
+    if not prep_filtrado.empty:
+        prom_ton = prep_filtrado["toneladas_procesadas"].mean()
+        sobre_promedio = prep_filtrado[prep_filtrado["toneladas_procesadas"] > prom_ton]
+
+    col_q1, col_q2 = st.columns(2)
+
+    with col_q1:
+        st.markdown("#### Top procesos por toneladas")
+        st.dataframe(top_ton, use_container_width=True)
+
+        st.markdown("#### Top procesos por costo promedio")
+        st.dataframe(top_costo, use_container_width=True)
+
+    with col_q2:
+        st.markdown("#### Procesos con mayor consumo energético por tonelada")
+        st.dataframe(energia_ton, use_container_width=True)
+
+        st.markdown("#### Registros con toneladas sobre el promedio")
+        st.dataframe(sobre_promedio, use_container_width=True)
 
     st.markdown("---")
 
     # -----------------------------------------------------
-    # GRÁFICO 3: RECUPERACIÓN VS ENERGÍA
+    # RESUMEN DESCARGABLE
     # -----------------------------------------------------
-    col3, col4 = st.columns(2)
+    st.markdown("### ⬇️ Exportar resumen ejecutivo")
 
-    with col3:
-        st.markdown("### Recuperación vs consumo de energía")
-        fig3, ax3 = plt.subplots(figsize=(8, 4))
-        ax3.scatter(
-            prep_filtrado["consumo_energia_kwh"],
-            prep_filtrado["porcentaje_recuperacion"]
-        )
-        ax3.set_xlabel("Consumo energía (kWh)")
-        ax3.set_ylabel("Recuperación (%)")
-        ax3.set_title("Recuperación vs energía")
-        st.pyplot(fig3)
+    resumen_dashboard = pd.DataFrame({
+        "indicador": [
+            "Toneladas totales",
+            "Costo promedio USD/t",
+            "Recuperación promedio %",
+            "Extracción promedio %",
+            "Mejora pureza promedio"
+        ],
+        "valor": [
+            total_ton,
+            costo_prom,
+            rec_prom,
+            ext_prom,
+            mejora_pureza_prom
+        ]
+    })
 
-    # -----------------------------------------------------
-    # GRÁFICO 4: EXTRACCIÓN VS TEMPERATURA
-    # -----------------------------------------------------
-    with col4:
-        st.markdown("### Extracción vs temperatura")
-        fig4, ax4 = plt.subplots(figsize=(8, 4))
-        ax4.scatter(
-            ext_filtrado["temperatura_procesos_celcius"],
-            ext_filtrado["porcentaje_extraccion"]
-        )
-        ax4.set_xlabel("Temperatura (°C)")
-        ax4.set_ylabel("Extracción (%)")
-        ax4.set_title("Extracción vs temperatura")
-        st.pyplot(fig4)
-
-    st.markdown("---")
-
-    # -----------------------------------------------------
-    # TABLAS RESUMEN
-    # -----------------------------------------------------
-    st.markdown("### 📋 Resumen por proceso")
-
-    resumen = (
-        prep_filtrado.groupby("proceso", as_index=False)
-        .agg({
-            "toneladas_procesadas": "sum",
-            "costo_tonelada_usd": "mean",
-            "porcentaje_recuperacion": "mean",
-            "consumo_energia_kwh": "sum"
-        })
-        .rename(columns={
-            "toneladas_procesadas": "total_toneladas",
-            "costo_tonelada_usd": "costo_promedio",
-            "porcentaje_recuperacion": "recuperacion_promedio",
-            "consumo_energia_kwh": "energia_total"
-        })
-    )
-
-    st.dataframe(resumen, use_container_width=True)
+    st.dataframe(resumen_dashboard, use_container_width=True)
 
     st.download_button(
-        label="⬇️ Descargar resumen del dashboard",
-        data=resumen.to_csv(index=False).encode("utf-8"),
-        file_name="dashboard_resumen.csv",
+        label="Descargar resumen ejecutivo",
+        data=resumen_dashboard.to_csv(index=False).encode("utf-8"),
+        file_name="resumen_dashboard.csv",
         mime="text/csv"
     )
