@@ -11,7 +11,10 @@ st.set_page_config(
     page_icon="🐬",
     layout="wide"
 )
-
+# HEADER
+# =========================================================
+st.image(BASE_DIR / "header_mejorado.png", use_container_width=True)
+st.markdown("---")
 # =========================================================
 # RUTA BASE
 # =========================================================
