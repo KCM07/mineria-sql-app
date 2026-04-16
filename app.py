@@ -7,7 +7,7 @@ from pathlib import Path
 # CONFIGURACIÓN GENERAL
 # =========================================================
 st.set_page_config(
-    page_title="🗃️CODEaUNI - MINERIA -  SQL - APP",
+    page_title="CODEaUNI - MINERIA -  SQL - APP 🗃️",
     page_icon="🐬",
     layout="wide"
 )
@@ -76,7 +76,7 @@ refinacion = convertir_fecha(refinacion, "fecha")
 st.title("💻 GESTIÓN DE BASES DE DATOS EN MINERÍA - MySQL🐬")
 st.markdown(
     "Visualización interactiva de la información operativa de "
-    "**preparación, extracción y refinación                                            Elaborado por: Kem Carbajal Moscoso**."
+    "**preparación, extracción y refinación**."
 )
 
 # =========================================================
