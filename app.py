@@ -13,8 +13,7 @@ st.set_page_config(
 )
 # HEADER
 # =========================================================
-st.image(BASE_DIR / "header_mejorado.png", use_container_width=True)
-st.markdown("---")
+st.image("header_raster_mejorado.png", use_container_width=True)
 # =========================================================
 # RUTA BASE
 # =========================================================
