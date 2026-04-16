@@ -7,8 +7,8 @@ from pathlib import Path
 # CONFIGURACIÓN GENERAL
 # =========================================================
 st.set_page_config(
-    page_title="CODEaUNI - MINERIA -  SQL - APP",
-    page_icon="🐬🗃️",
+    page_title="🗃️CODEaUNI - MINERIA -  SQL - APP",
+    page_icon="🐬",
     layout="wide"
 )
 
