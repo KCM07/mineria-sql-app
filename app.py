@@ -116,7 +116,7 @@ if seccion == "Inicio":
     st.write("- refinacion_metales.csv")
 
     st.markdown("---")
-    st.markdown("### 🧠 Descripción")
+    st.markdown("### 📝 Descripción")
     st.write(
         "La aplicación permite explorar la base de datos minera, revisar relaciones "
         "entre tablas, identificar anomalías y analizar indicadores operativos mediante "
