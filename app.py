@@ -4,27 +4,26 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 # =========================================================
-# CONFIGURACIÓN GENERAL DE LA APP
+# CONFIGURACIÓN GENERAL
 # =========================================================
 st.set_page_config(
-    page_title="Minería SQL App",
+    page_title="Dashboard Minero",
     page_icon="⛏️",
     layout="wide"
 )
 
 # =========================================================
-# RUTA BASE DEL PROYECTO
+# RUTA BASE
 # =========================================================
 BASE_DIR = Path(__file__).resolve().parent
 
 # =========================================================
 # FUNCIÓN PARA CARGAR CSV
 # =========================================================
-
 @st.cache_data
 def cargar_csv(nombre_archivo: str) -> pd.DataFrame:
     """
-    Carga un CSV probando varias codificaciones comunes.
+    Carga archivos CSV probando codificaciones comunes.
     """
     ruta = BASE_DIR / nombre_archivo
 
@@ -36,8 +35,7 @@ def cargar_csv(nombre_archivo: str) -> pd.DataFrame:
 
     for enc in codificaciones:
         try:
-            df = pd.read_csv(ruta, encoding=enc)
-            return df
+            return pd.read_csv(ruta, encoding=enc)
         except UnicodeDecodeError:
             continue
         except Exception as e:
@@ -47,8 +45,9 @@ def cargar_csv(nombre_archivo: str) -> pd.DataFrame:
     st.error(f"No se pudo leer {nombre_archivo} con las codificaciones probadas.")
     return pd.DataFrame()
 
+
 # =========================================================
-# CARGA DE TABLAS
+# CARGA DE DATOS
 # =========================================================
 dim_procesos = cargar_csv("dim_procesos.csv")
 preparacion = cargar_csv("preparacion_minerales.csv")
@@ -56,11 +55,11 @@ extraccion = cargar_csv("extraccion_metales.csv")
 refinacion = cargar_csv("refinacion_metales.csv")
 
 # =========================================================
-# LIMPIEZA Y AJUSTES BÁSICOS
+# LIMPIEZA BÁSICA
 # =========================================================
 def convertir_fecha(df: pd.DataFrame, columna: str = "fecha") -> pd.DataFrame:
     """
-    Convierte la columna fecha a tipo datetime si existe.
+    Convierte una columna de fecha a datetime si existe.
     """
     if columna in df.columns:
         df[columna] = pd.to_datetime(df[columna], errors="coerce")
@@ -74,10 +73,10 @@ refinacion = convertir_fecha(refinacion, "fecha")
 # =========================================================
 # TÍTULO PRINCIPAL
 # =========================================================
-st.title("⛏️ Gestión de Bases de Datos en Minería")
+st.title("⛏️ Dashboard de Procesos Mineros")
 st.markdown(
-    "Aplicación interactiva para visualizar, consultar y analizar "
-    "los procesos mineros de **preparación, extracción y refinación**."
+    "Visualización interactiva de la información operativa de "
+    "**preparación, extracción y refinación**."
 )
 
 # =========================================================
@@ -93,8 +92,7 @@ seccion = st.sidebar.radio(
         "Relaciones",
         "Control de calidad",
         "Consultas analíticas",
-        "Dashboard",
-        "SQL simulado"
+        "Dashboard"
     ]
 )
 
@@ -102,14 +100,13 @@ seccion = st.sidebar.radio(
 # SECCIÓN: INICIO
 # =========================================================
 if seccion == "Inicio":
-    st.subheader("📌 Resumen del proyecto")
+    st.subheader("📌 Resumen general")
 
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric("Procesos en dimensión", len(dim_procesos))
-    col2.metric("Registros preparación", len(preparacion))
-    col3.metric("Registros extracción", len(extraccion))
-    col4.metric("Registros refinación", len(refinacion))
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Procesos", len(dim_procesos))
+    c2.metric("Preparación", len(preparacion))
+    c3.metric("Extracción", len(extraccion))
+    c4.metric("Refinación", len(refinacion))
 
     st.markdown("---")
     st.markdown("### 📁 Archivos cargados")
@@ -119,12 +116,11 @@ if seccion == "Inicio":
     st.write("- refinacion_metales.csv")
 
     st.markdown("---")
-    st.markdown("### 🧠 Modelo de datos")
+    st.markdown("### 🧠 Descripción")
     st.write(
-        "La tabla **dim_procesos** funciona como dimensión central, "
-        "mientras que las tablas **preparacion_minerales**, "
-        "**extraccion_metales** y **refinacion_metales** almacenan la "
-        "información operativa de cada etapa."
+        "La aplicación permite explorar la base de datos minera, revisar relaciones "
+        "entre tablas, identificar anomalías y analizar indicadores operativos mediante "
+        "un dashboard interactivo."
     )
 
 # =========================================================
@@ -156,9 +152,8 @@ elif seccion == "Ver tablas":
 
     st.dataframe(df_tabla.head(limite), use_container_width=True)
 
-    # Botón para descargar la tabla seleccionada
     st.download_button(
-        label="⬇️ Descargar tabla en CSV",
+        label="⬇️ Descargar tabla",
         data=df_tabla.to_csv(index=False).encode("utf-8"),
         file_name=f"{opcion_tabla}.csv",
         mime="text/csv"
@@ -170,58 +165,39 @@ elif seccion == "Ver tablas":
 elif seccion == "Relaciones":
     st.subheader("🔗 Verificación de relaciones")
 
-    # Verificamos registros huérfanos en preparación
-    prep_rel = preparacion.merge(
-        dim_procesos,
-        on="id_proceso",
-        how="left",
-        indicator=True
-    )
+    prep_rel = preparacion.merge(dim_procesos, on="id_proceso", how="left", indicator=True)
     prep_huerfanos = prep_rel[prep_rel["_merge"] == "left_only"]
 
-    # Verificamos registros huérfanos en extracción
-    ext_rel = extraccion.merge(
-        dim_procesos,
-        on="id_proceso",
-        how="left",
-        indicator=True
-    )
+    ext_rel = extraccion.merge(dim_procesos, on="id_proceso", how="left", indicator=True)
     ext_huerfanos = ext_rel[ext_rel["_merge"] == "left_only"]
 
-    # Verificamos registros huérfanos en refinación
+    ref_huerfanos = pd.DataFrame()
     if "id_proceso" in refinacion.columns:
-        ref_rel = refinacion.merge(
-            dim_procesos,
-            on="id_proceso",
-            how="left",
-            indicator=True
-        )
+        ref_rel = refinacion.merge(dim_procesos, on="id_proceso", how="left", indicator=True)
         ref_huerfanos = ref_rel[ref_rel["_merge"] == "left_only"]
-    else:
-        ref_huerfanos = pd.DataFrame()
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Huérfanos en preparación", len(prep_huerfanos))
-    col2.metric("Huérfanos en extracción", len(ext_huerfanos))
-    col3.metric("Huérfanos en refinación", len(ref_huerfanos))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Huérfanos preparación", len(prep_huerfanos))
+    c2.metric("Huérfanos extracción", len(ext_huerfanos))
+    c3.metric("Huérfanos refinación", len(ref_huerfanos))
 
     st.markdown("---")
 
     if len(prep_huerfanos) == 0 and len(ext_huerfanos) == 0 and len(ref_huerfanos) == 0:
         st.success("No se encontraron registros huérfanos. Las relaciones son consistentes.")
     else:
-        st.warning("Se encontraron registros sin correspondencia en la tabla dimensión.")
+        st.warning("Se detectaron registros sin correspondencia en la tabla dimensión.")
 
         if len(prep_huerfanos) > 0:
-            st.markdown("### Preparación sin correspondencia")
+            st.markdown("### Registros huérfanos en preparación")
             st.dataframe(prep_huerfanos, use_container_width=True)
 
         if len(ext_huerfanos) > 0:
-            st.markdown("### Extracción sin correspondencia")
+            st.markdown("### Registros huérfanos en extracción")
             st.dataframe(ext_huerfanos, use_container_width=True)
 
         if len(ref_huerfanos) > 0:
-            st.markdown("### Refinación sin correspondencia")
+            st.markdown("### Registros huérfanos en refinación")
             st.dataframe(ref_huerfanos, use_container_width=True)
 
 # =========================================================
@@ -230,23 +206,21 @@ elif seccion == "Relaciones":
 elif seccion == "Control de calidad":
     st.subheader("🧪 Control de calidad de datos")
 
-    # Reglas de control para preparación
     prep_anomalias = preparacion[
         (preparacion["porcentaje_recuperacion"] > 100) |
         (preparacion["porcentaje_recuperacion"] < 0) |
         (preparacion["tiempo_operacion_horas"] < 0)
     ]
 
-    # Reglas de control para extracción
     ext_anomalias = extraccion[
         (extraccion["porcentaje_extraccion"] > 100) |
         (extraccion["porcentaje_extraccion"] < 0) |
         (extraccion["temperatura_procesos_celcius"] < 0)
     ]
 
-    col1, col2 = st.columns(2)
-    col1.metric("Anomalías en preparación", len(prep_anomalias))
-    col2.metric("Anomalías en extracción", len(ext_anomalias))
+    c1, c2 = st.columns(2)
+    c1.metric("Anomalías preparación", len(prep_anomalias))
+    c2.metric("Anomalías extracción", len(ext_anomalias))
 
     st.markdown("---")
 
@@ -271,24 +245,17 @@ elif seccion == "Consultas analíticas":
     consulta = st.selectbox(
         "Selecciona una consulta:",
         [
-            "1. Total de toneladas por proceso",
-            "2. Costo promedio por proceso",
-            "3. Tiempo promedio de operación",
-            "4. Recuperación vs energía",
-            "5. Extracción vs temperatura",
-            "6. Mejora de pureza en refinación",
-            "7. Registros sobre el promedio",
-            "8. Reporte operativo con JOIN",
-            "9. Consumo energético por tonelada"
+            "Toneladas por proceso",
+            "Costo promedio por proceso",
+            "Tiempo promedio de operación",
+            "Mejora de pureza en refinación",
+            "Consumo energético por tonelada"
         ]
     )
 
     resultado = pd.DataFrame()
 
-    # -----------------------------------------------------
-    # Consulta 1
-    # -----------------------------------------------------
-    if consulta == "1. Total de toneladas por proceso":
+    if consulta == "Toneladas por proceso":
         resultado = (
             preparacion.merge(dim_procesos, on="id_proceso", how="left")
             .groupby("proceso", as_index=False)["toneladas_procesadas"]
@@ -297,10 +264,7 @@ elif seccion == "Consultas analíticas":
             .sort_values("total_toneladas", ascending=False)
         )
 
-    # -----------------------------------------------------
-    # Consulta 2
-    # -----------------------------------------------------
-    elif consulta == "2. Costo promedio por proceso":
+    elif consulta == "Costo promedio por proceso":
         resultado = (
             preparacion.merge(dim_procesos, on="id_proceso", how="left")
             .groupby("proceso", as_index=False)["costo_tonelada_usd"]
@@ -309,10 +273,7 @@ elif seccion == "Consultas analíticas":
             .sort_values("costo_promedio", ascending=False)
         )
 
-    # -----------------------------------------------------
-    # Consulta 3
-    # -----------------------------------------------------
-    elif consulta == "3. Tiempo promedio de operación":
+    elif consulta == "Tiempo promedio de operación":
         resultado = (
             preparacion.merge(dim_procesos, on="id_proceso", how="left")
             .groupby("proceso", as_index=False)["tiempo_operacion_horas"]
@@ -321,55 +282,14 @@ elif seccion == "Consultas analíticas":
             .sort_values("tiempo_promedio", ascending=False)
         )
 
-    # -----------------------------------------------------
-    # Consulta 4
-    # -----------------------------------------------------
-    elif consulta == "4. Recuperación vs energía":
-        resultado = preparacion[
-            ["fecha", "id_proceso", "porcentaje_recuperacion", "consumo_energia_kwh"]
-        ].sort_values("porcentaje_recuperacion", ascending=False)
-
-    # -----------------------------------------------------
-    # Consulta 5
-    # -----------------------------------------------------
-    elif consulta == "5. Extracción vs temperatura":
-        resultado = extraccion[
-            ["fecha", "id_proceso", "porcentaje_extraccion", "temperatura_procesos_celcius"]
-        ].sort_values("porcentaje_extraccion", ascending=False)
-
-    # -----------------------------------------------------
-    # Consulta 6
-    # -----------------------------------------------------
-    elif consulta == "6. Mejora de pureza en refinación":
+    elif consulta == "Mejora de pureza en refinación":
         resultado = refinacion.copy()
-        resultado["mejora_pureza"] = (
-            resultado["pureza_final_pct"] - resultado["pureza_inicial_pct"]
-        )
+        resultado["mejora_pureza"] = resultado["pureza_final_pct"] - resultado["pureza_inicial_pct"]
         resultado = resultado[
             ["proceso", "pureza_inicial_pct", "pureza_final_pct", "mejora_pureza"]
         ].sort_values("mejora_pureza", ascending=False)
 
-    # -----------------------------------------------------
-    # Consulta 7
-    # -----------------------------------------------------
-    elif consulta == "7. Registros sobre el promedio":
-        promedio = preparacion["toneladas_procesadas"].mean()
-        resultado = preparacion[preparacion["toneladas_procesadas"] > promedio]
-
-    # -----------------------------------------------------
-    # Consulta 8
-    # -----------------------------------------------------
-    elif consulta == "8. Reporte operativo con JOIN":
-        resultado = (
-            preparacion.merge(dim_procesos, on="id_proceso", how="left")
-            [["proceso", "tipo_proceso", "fecha", "toneladas_procesadas", "costo_tonelada_usd"]]
-            .sort_values("fecha")
-        )
-
-    # -----------------------------------------------------
-    # Consulta 9
-    # -----------------------------------------------------
-    elif consulta == "9. Consumo energético por tonelada":
+    elif consulta == "Consumo energético por tonelada":
         tmp = preparacion.merge(dim_procesos, on="id_proceso", how="left")
         resultado = (
             tmp.groupby("proceso", as_index=False)
@@ -378,9 +298,7 @@ elif seccion == "Consultas analíticas":
                 "toneladas_procesadas": "sum"
             })
         )
-        resultado["kwh_por_tonelada"] = (
-            resultado["consumo_energia_kwh"] / resultado["toneladas_procesadas"]
-        )
+        resultado["kwh_por_tonelada"] = resultado["consumo_energia_kwh"] / resultado["toneladas_procesadas"]
         resultado = resultado[["proceso", "kwh_por_tonelada"]].sort_values(
             "kwh_por_tonelada", ascending=False
         )
@@ -398,81 +316,151 @@ elif seccion == "Consultas analíticas":
 # SECCIÓN: DASHBOARD
 # =========================================================
 elif seccion == "Dashboard":
-    st.subheader("📈 Dashboard de indicadores")
+    st.subheader("📈 Dashboard interactivo")
 
-    # KPI 1: total toneladas preparación
-    total_ton_prep = preparacion["toneladas_procesadas"].sum()
+    # -----------------------------------------------------
+    # FILTROS
+    # -----------------------------------------------------
+    st.markdown("### 🎛️ Filtros")
 
-    # KPI 2: costo promedio preparación
-    costo_prom_prep = preparacion["costo_tonelada_usd"].mean()
+    procesos_disponibles = sorted(dim_procesos["proceso"].dropna().unique().tolist())
+    procesos_seleccionados = st.multiselect(
+        "Filtrar por proceso",
+        options=procesos_disponibles,
+        default=procesos_disponibles
+    )
 
-    # KPI 3: extracción promedio
-    extraccion_prom = extraccion["porcentaje_extraccion"].mean()
+    # Unimos preparación con dimensión para filtrar por nombre
+    prep_full = preparacion.merge(dim_procesos, on="id_proceso", how="left")
+    ext_full = extraccion.merge(dim_procesos, on="id_proceso", how="left")
 
-    # KPI 4: mejora promedio en refinación
-    mejora_prom_ref = (refinacion["pureza_final_pct"] - refinacion["pureza_inicial_pct"]).mean()
+    if procesos_seleccionados:
+        prep_filtrado = prep_full[prep_full["proceso"].isin(procesos_seleccionados)].copy()
+        ext_filtrado = ext_full[ext_full["proceso"].isin(procesos_seleccionados)].copy()
+    else:
+        prep_filtrado = prep_full.copy()
+        ext_filtrado = ext_full.copy()
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Toneladas preparación", f"{total_ton_prep:,.2f}")
-    c2.metric("Costo promedio preparación", f"{costo_prom_prep:,.2f}")
-    c3.metric("Extracción promedio (%)", f"{extraccion_prom:,.2f}")
-    c4.metric("Mejora pureza promedio", f"{mejora_prom_ref:,.2f}")
+    # -----------------------------------------------------
+    # KPIs
+    # -----------------------------------------------------
+    st.markdown("### 📌 Indicadores clave")
+
+    total_ton = prep_filtrado["toneladas_procesadas"].sum()
+    costo_prom = prep_filtrado["costo_tonelada_usd"].mean()
+    recuperacion_prom = prep_filtrado["porcentaje_recuperacion"].mean()
+    extraccion_prom = ext_filtrado["porcentaje_extraccion"].mean()
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Toneladas procesadas", f"{total_ton:,.2f}")
+    k2.metric("Costo promedio USD/t", f"{costo_prom:,.2f}")
+    k3.metric("Recuperación promedio %", f"{recuperacion_prom:,.2f}")
+    k4.metric("Extracción promedio %", f"{extraccion_prom:,.2f}")
 
     st.markdown("---")
 
-    # Gráfico 1: toneladas por proceso
-    st.markdown("### Toneladas procesadas por proceso")
+    # -----------------------------------------------------
+    # GRÁFICO 1: TONELADAS POR PROCESO
+    # -----------------------------------------------------
+    col1, col2 = st.columns(2)
 
-    graf1 = (
-        preparacion.merge(dim_procesos, on="id_proceso", how="left")
-        .groupby("proceso", as_index=False)["toneladas_procesadas"]
-        .sum()
-        .sort_values("toneladas_procesadas", ascending=False)
+    with col1:
+        st.markdown("### Toneladas por proceso")
+        graf1 = (
+            prep_filtrado.groupby("proceso", as_index=False)["toneladas_procesadas"]
+            .sum()
+            .sort_values("toneladas_procesadas", ascending=False)
+        )
+
+        fig1, ax1 = plt.subplots(figsize=(8, 4))
+        ax1.bar(graf1["proceso"], graf1["toneladas_procesadas"])
+        ax1.set_xlabel("Proceso")
+        ax1.set_ylabel("Toneladas")
+        ax1.set_title("Toneladas procesadas")
+        plt.xticks(rotation=45)
+        st.pyplot(fig1)
+
+    # -----------------------------------------------------
+    # GRÁFICO 2: COSTO PROMEDIO POR PROCESO
+    # -----------------------------------------------------
+    with col2:
+        st.markdown("### Costo promedio por proceso")
+        graf2 = (
+            prep_filtrado.groupby("proceso", as_index=False)["costo_tonelada_usd"]
+            .mean()
+            .sort_values("costo_tonelada_usd", ascending=False)
+        )
+
+        fig2, ax2 = plt.subplots(figsize=(8, 4))
+        ax2.bar(graf2["proceso"], graf2["costo_tonelada_usd"])
+        ax2.set_xlabel("Proceso")
+        ax2.set_ylabel("USD/t")
+        ax2.set_title("Costo promedio")
+        plt.xticks(rotation=45)
+        st.pyplot(fig2)
+
+    st.markdown("---")
+
+    # -----------------------------------------------------
+    # GRÁFICO 3: RECUPERACIÓN VS ENERGÍA
+    # -----------------------------------------------------
+    col3, col4 = st.columns(2)
+
+    with col3:
+        st.markdown("### Recuperación vs consumo de energía")
+        fig3, ax3 = plt.subplots(figsize=(8, 4))
+        ax3.scatter(
+            prep_filtrado["consumo_energia_kwh"],
+            prep_filtrado["porcentaje_recuperacion"]
+        )
+        ax3.set_xlabel("Consumo energía (kWh)")
+        ax3.set_ylabel("Recuperación (%)")
+        ax3.set_title("Recuperación vs energía")
+        st.pyplot(fig3)
+
+    # -----------------------------------------------------
+    # GRÁFICO 4: EXTRACCIÓN VS TEMPERATURA
+    # -----------------------------------------------------
+    with col4:
+        st.markdown("### Extracción vs temperatura")
+        fig4, ax4 = plt.subplots(figsize=(8, 4))
+        ax4.scatter(
+            ext_filtrado["temperatura_procesos_celcius"],
+            ext_filtrado["porcentaje_extraccion"]
+        )
+        ax4.set_xlabel("Temperatura (°C)")
+        ax4.set_ylabel("Extracción (%)")
+        ax4.set_title("Extracción vs temperatura")
+        st.pyplot(fig4)
+
+    st.markdown("---")
+
+    # -----------------------------------------------------
+    # TABLAS RESUMEN
+    # -----------------------------------------------------
+    st.markdown("### 📋 Resumen por proceso")
+
+    resumen = (
+        prep_filtrado.groupby("proceso", as_index=False)
+        .agg({
+            "toneladas_procesadas": "sum",
+            "costo_tonelada_usd": "mean",
+            "porcentaje_recuperacion": "mean",
+            "consumo_energia_kwh": "sum"
+        })
+        .rename(columns={
+            "toneladas_procesadas": "total_toneladas",
+            "costo_tonelada_usd": "costo_promedio",
+            "porcentaje_recuperacion": "recuperacion_promedio",
+            "consumo_energia_kwh": "energia_total"
+        })
     )
 
-    fig1, ax1 = plt.subplots(figsize=(10, 5))
-    ax1.bar(graf1["proceso"], graf1["toneladas_procesadas"])
-    ax1.set_xlabel("Proceso")
-    ax1.set_ylabel("Toneladas")
-    ax1.set_title("Toneladas procesadas por proceso")
-    plt.xticks(rotation=45)
-    st.pyplot(fig1)
+    st.dataframe(resumen, use_container_width=True)
 
-    # Gráfico 2: costo promedio por proceso
-    st.markdown("### Costo promedio por proceso")
-
-    graf2 = (
-        preparacion.merge(dim_procesos, on="id_proceso", how="left")
-        .groupby("proceso", as_index=False)["costo_tonelada_usd"]
-        .mean()
-        .sort_values("costo_tonelada_usd", ascending=False)
+    st.download_button(
+        label="⬇️ Descargar resumen del dashboard",
+        data=resumen.to_csv(index=False).encode("utf-8"),
+        file_name="dashboard_resumen.csv",
+        mime="text/csv"
     )
-
-    fig2, ax2 = plt.subplots(figsize=(10, 5))
-    ax2.bar(graf2["proceso"], graf2["costo_tonelada_usd"])
-    ax2.set_xlabel("Proceso")
-    ax2.set_ylabel("Costo promedio")
-    ax2.set_title("Costo promedio por proceso")
-    plt.xticks(rotation=45)
-    st.pyplot(fig2)
-
-# =========================================================..
-# SECCIÓN: SQL SIMULADO
-# =========================================================..
-elif seccion == "SQL simulado":
-    st.subheader("🧠 SQL simulado")
-
-    st.info(
-        "Esta sección no ejecuta SQL real. "
-        "Sirve para mostrar consultas escritas y sus resultados equivalentes usando pandas."
-    )
-
-    consulta_sql = st.text_area(
-        "Escribe una consulta SQL de ejemplo:",
-        value="SELECT * FROM dim_procesos;"
-    )
-
-    st.code(consulta_sql, language="sql")
-
-    if st.button("Mostrar tabla ejemplo"):
-        st.dataframe(dim_procesos, use_container_width=True)
