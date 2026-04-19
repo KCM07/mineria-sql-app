@@ -35,6 +35,7 @@ def cargar_csv(nombre_archivo: str) -> pd.DataFrame:
 
     codificaciones = ["utf-8", "latin-1", "cp1252"]
 
+
     for enc in codificaciones:
         try:
             return pd.read_csv(ruta, encoding=enc)
